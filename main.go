@@ -7,9 +7,50 @@ import (
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
-const VERSION string = "2017-02-06"
+const (
+	VERSION   string = "2017-02-06"
+	UA        string = "VGT MnM ApiCheck/1.0"
+	DEF_TMOUT int    = 10
+)
+
+// getUrl() fetches a URL and returns the HTTP response
+func getUrl(url string, verifySSL bool, timeout time.Duration, ua string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if ua == "" {
+		req.Header.Set("User-Agent", UA)
+	} else {
+		req.Header.Set("User-Agent", ua)
+	}
+
+	tr := &http.Transport{
+		DisableKeepAlives: true, // we're (probably) not reusing the connection, so don't let it hang open
+	}
+
+	if !verifySSL {
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+
+	if timeout == nil {
+		timeout = time.Second * time.Duration(DEF_TMOUT)
+	}
+
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   timeout,
+	}
+
+	return client.Do(req)
+}
+
+func parse() {
+}
 
 func entryPoint(ctx *cli.Context) error {
 	file, err := os.Open("sample.xml")
