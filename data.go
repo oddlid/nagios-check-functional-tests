@@ -38,6 +38,18 @@ type Check struct {
 
 type Checks []Check
 type Applications []Application
+type Keys []string
+
+func (k Keys) MaxLen() int {
+	max := 0
+	for i := range k {
+		klen := len(k[i])
+		if klen > max {
+			max = klen
+		}
+	}
+	return max
+}
 
 // _pp left-pads a string with <prefix> repeated <level> times,
 // then right-pads the word <key> up to <align> length, then prints " : <val>\n"
@@ -47,52 +59,88 @@ func _pp(w io.Writer, prefix, key, val string, align, level int) {
 }
 
 func (c Check) pp(w io.Writer, prefix string, level int) {
-	p := func(k, v string) {
-		_pp(w, prefix, k, v, 13, level)
+	k := Keys{
+		"Name",
+		"Success",
+		"FailureReason",
 	}
-	p("Name", c.Name)
-	p("Success", fmt.Sprintf("%t", c.Success))
-	p("FailureReason", c.FailureReason)
+	max := k.MaxLen()
+	p := func(k, v string) {
+		_pp(w, prefix, k, v, max, level)
+	}
+	p(k[0], c.Name)
+	p(k[1], fmt.Sprintf("%t", c.Success))
+	p(k[2], c.FailureReason)
 }
 
 func (a Application) pp(w io.Writer, prefix string, level int) {
-	p := func(k, v string) {
-		_pp(w, prefix, k, v, 16, level)
+	k := Keys{
+		"LongName",
+		"ShortName",
+		"ComponentVersion",
+		"Success",
+		"FailureReason",
+		"#=== Check",
 	}
-	p("LongName", a.LongName)
-	p("ShortName", a.ShortName)
-	p("ComponentVersion", a.ComponentVersion)
-	p("Success", fmt.Sprintf("%t", a.Success))
-	p("FailureReason", a.FailureReason)
-	if len(a.Check) > 0 {
-		for i := range a.Check {
-			p("Check", "")
-			a.Check[i].pp(w, prefix, level+1)
+	max := k.MaxLen()
+	p := func(k, v string) {
+		_pp(w, prefix, k, v, max, level)
+	}
+
+	p(k[0], a.LongName)
+	p(k[1], a.ShortName)
+	p(k[2], a.ComponentVersion)
+	p(k[3], fmt.Sprintf("%t", a.Success))
+	p(k[4], a.FailureReason)
+
+	if a.Check != nil {
+		chklen := len(a.Check)
+		if chklen > 0 {
+			for i := range a.Check {
+				p(k[5], fmt.Sprintf("(#%d/%d) ===#", i+1, chklen))
+				a.Check[i].pp(w, prefix, level+1)
+			}
 		}
 	}
 }
 
 func (cr CheckResponse) pp(w io.Writer, prefix string, level int) {
+	k := Keys{
+		"#=== CheckResponse",
+		"URL",
+		"HTTP code",
+		"Response time",
+		"Error",
+		"MinorVersion",
+		"#=== Application",
+	}
+	max := k.MaxLen()
 	p := func(k, v string) {
-		_pp(w, prefix, k, v, 13, level)
+		_pp(w, prefix, k, v, max, level)
 	}
-	p("URL", cr.URL)
-	p("HTTP code", fmt.Sprintf("%d", cr.HTTPCode))
-	p("Response time", fmt.Sprintf("%f", cr.ResponseTime.Seconds()))
+
+	p(k[0], "===#")
+	p(k[1], cr.URL)
+	p(k[2], fmt.Sprintf("%d", cr.HTTPCode))
+	p(k[3], fmt.Sprintf("%f", cr.ResponseTime.Seconds()))
 	if cr.Err != nil {
-		p("Error", cr.Err.Error())
+		p(k[4], cr.Err.Error())
 	}
-	p("MinorVersion", fmt.Sprintf("%d", cr.MinorVersion))
-	if len(cr.Application) > 0 {
-		for i := range cr.Application {
-			p("Application", "")
-			cr.Application[i].pp(w, prefix, level+1)
+	p(k[5], fmt.Sprintf("%d", cr.MinorVersion))
+
+	if cr.Application != nil {
+		applen := len(cr.Application)
+		if applen > 0 {
+			for i := range cr.Application {
+				p(k[6], fmt.Sprintf("(#%d/%d) ===#", i+1, applen))
+				cr.Application[i].pp(w, prefix, level+1)
+			}
 		}
 	}
 }
 
 func (cr CheckResponse) PrettyPrint(w io.Writer) {
-	cr.pp(w, "  ", 0)
+	cr.pp(w, DEF_INDENT, 0)
 }
 
 func (cr CheckResponse) String() string {
