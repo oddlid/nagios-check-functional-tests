@@ -1,19 +1,32 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/xml"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"time"
 )
 
 const (
-	VERSION   string = "2017-02-06"
-	UA        string = "VGT MnM ApiCheck/1.0"
-	DEF_TMOUT int    = 10
+	VERSION    string  = "2017-02-06"
+	UA         string  = "VGT MnM ApiCheck/1.0"
+	DEF_TMOUT  float64 = 30.0
+	DEF_WARN   float64 = 10.0
+	DEF_CRIT   float64 = 15.0
+	DEF_PORT   int     = 80
+	E_OK       int     = 0
+	E_WARNING  int     = 1
+	E_CRITICAL int     = 2
+	E_UNKNOWN  int     = 3
+	S_OK       string  = "OK"
+	S_WARNING  string  = "WARNING"
+	S_CRITICAL string  = "CRITICAL"
+	S_UNKNOWN  string  = "UNKNOWN"
 )
 
 // getUrl() fetches a URL and returns the HTTP response
@@ -37,52 +50,119 @@ func getUrl(url string, verifySSL bool, timeout time.Duration, ua string) (*http
 		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
-	if timeout == nil {
-		timeout = time.Second * time.Duration(DEF_TMOUT)
-	}
-
 	client := &http.Client{
 		Transport: tr,
 		Timeout:   timeout,
 	}
 
+	//log.Debugf("getUrl(): request object: %#v", req)
+
 	return client.Do(req)
 }
 
-func parse() {
+func parse(url string, timeout time.Duration, ch chan CheckResponse) {
+	cr := CheckResponse{URL: url}
+	t_start := time.Now()
+	resp, err := getUrl(url, false, timeout, "")
+	cr.ResponseTime = time.Now().Sub(t_start)
+	if err != nil {
+		log.Error(err)
+		cr.Err = err
+		ch <- cr
+		return
+	}
+	defer resp.Body.Close()
+	cr.HTTPCode = resp.StatusCode
+
+	if cr.HTTPCode != http.StatusOK {
+		ch <- cr
+		return
+	}
+
+	cr.Body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Error(err)
+		cr.Err = err
+		ch <- cr
+		return
+	}
+
+	err = xml.Unmarshal(cr.Body, &cr)
+	if err != nil {
+		log.Error(err)
+		cr.Err = err
+	}
+
+	ch <- cr
 }
 
 func entryPoint(ctx *cli.Context) error {
-	file, err := os.Open("sample.xml")
-	if err != nil {
-		log.Error(err)
-		return err
+	url := ctx.String("url")
+	verbose := ctx.Bool("verbose")
+	warn := ctx.Float64("warning")
+	crit := ctx.Float64("critical")
+	to := ctx.Float64("timeout")
+	tmout := time.Second * time.Duration(to)
+
+	log.WithFields(log.Fields{
+		"url":      url,
+		"verbose":  verbose,
+		"warning":  warn,
+		"critical": crit,
+		"timeout":  to,
+	}).Debug("Entrypoint params")
+
+	chres := make(chan CheckResponse)
+	defer close(chres)
+
+	go parse(url, tmout, chres)
+
+	// helper func for printing results and exiting
+	_e := func(ecode int, desc string, cr *CheckResponse) {
+		perfstr := fmt.Sprintf("|time=%fs;%f;%f\n", cr.ResponseTime.Seconds(), warn, crit)
+		var status string
+		switch ecode {
+		case E_OK:
+			status = S_OK
+		case E_WARNING:
+			status = S_WARNING
+		case E_CRITICAL:
+			status = S_CRITICAL
+		default:
+			status = S_UNKNOWN
+		}
+		msg := fmt.Sprintf("%s: %s; Response time: %f; URL: %q%s", status, desc, cr.ResponseTime.Seconds(), url, perfstr)
+		if verbose {
+			msg += cr.String()
+		}
+		fmt.Println(msg)
+		os.Exit(ecode)
 	}
-	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Error(err)
-		return err
+	select {
+	case res := <-chres:
+		if res.Err != nil {
+			_e(E_CRITICAL, fmt.Sprintf("%q", res.Err.Error()), &res)
+		}
+		if res.HTTPCode != http.StatusOK {
+			_e(E_UNKNOWN, fmt.Sprintf("HTTP problem, code: %d", res.HTTPCode), &res)
+		}
+		if !res.Ok() {
+			_e(E_CRITICAL, "Response tagged as failed, see long output", &res)
+		}
+		if res.ResponseTime.Seconds() >= crit {
+			_e(E_CRITICAL, "Response time at or above critical limit", &res)
+		}
+		if res.ResponseTime.Seconds() >= warn {
+			_e(E_WARNING, "Response time at or above warning limit", &res)
+		}
+		//fmt.Printf("%s\n", res.String())
+		_e(E_OK, "All good", &res)
+	case <-time.After(tmout):
+		fmt.Printf("%s: Timed out after %.2f seconds getting %q", S_UNKNOWN, to, url)
+		os.Exit(E_UNKNOWN)
 	}
 
-	cr := CheckResponse{}
-	err = xml.Unmarshal(data, &cr)
-	if err != nil {
-		log.Errorf("Unable to parse XML: %q", err)
-		return err
-	}
-
-	log.Debugf("%#v", cr)
-
-	//out, err := xml.MarshalIndent(cr, "", "\t")
-	//if err != nil {
-	//	log.Error(err)
-	//}
-	//os.Stdout.Write(out)
-
-	fmt.Printf("Pretty format:\n%s\n", cr.String())
-	fmt.Printf("All OK: %t\n", cr.Ok())
 
 	return nil
 }
@@ -101,6 +181,29 @@ func main() {
 	}
 
 	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "url, U",
+			Usage: "URL to check",
+		},
+		cli.Float64Flag{
+			Name:  "timeout, t",
+			Usage: "Timeout in seconds, fractions allowed",
+			Value: DEF_TMOUT,
+		},
+		cli.Float64Flag{
+			Name:  "warning, w",
+			Usage: "Warning responsetime in seconds, fractions allowed",
+			Value: DEF_WARN,
+		},
+		cli.Float64Flag{
+			Name:  "critical, c",
+			Usage: "Critical responsetime in seconds, fractions allowed",
+			Value: DEF_CRIT,
+		},
+		cli.BoolFlag{
+			Name:  "verbose",
+			Usage: "Print long output",
+		},
 		cli.StringFlag{
 			Name:  "log-level, l",
 			Value: "error",

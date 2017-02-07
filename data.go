@@ -6,12 +6,18 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 )
 
 type CheckResponse struct {
-	XMLName      xml.Name     `xml:"CheckResponse"`
-	MinorVersion int          `xml:"minorVersion"`
-	Application  Applications `xml:"application"`
+	XMLName      xml.Name      `xml:"CheckResponse"`
+	MinorVersion int           `xml:"minorVersion"`
+	Application  Applications  `xml:"application"`
+	ResponseTime time.Duration `xml:"-"`
+	Body         []byte        `xml:"-"`
+	HTTPCode     int           `xml:"-"`
+	URL          string        `xml:"-"`
+	Err          error         `xml:"-"`
 }
 
 type Application struct {
@@ -46,9 +52,7 @@ func (c Check) pp(w io.Writer, prefix string, level int) {
 	}
 	p("Name", c.Name)
 	p("Success", fmt.Sprintf("%t", c.Success))
-	if c.FailureReason != "" {
-		p("FailureReason", c.FailureReason)
-	}
+	p("FailureReason", c.FailureReason)
 }
 
 func (a Application) pp(w io.Writer, prefix string, level int) {
@@ -59,9 +63,7 @@ func (a Application) pp(w io.Writer, prefix string, level int) {
 	p("ShortName", a.ShortName)
 	p("ComponentVersion", a.ComponentVersion)
 	p("Success", fmt.Sprintf("%t", a.Success))
-	if a.FailureReason != "" {
-		p("FailureReason", a.FailureReason)
-	}
+	p("FailureReason", a.FailureReason)
 	if len(a.Check) > 0 {
 		for i := range a.Check {
 			p("Check", "")
@@ -72,7 +74,13 @@ func (a Application) pp(w io.Writer, prefix string, level int) {
 
 func (cr CheckResponse) pp(w io.Writer, prefix string, level int) {
 	p := func(k, v string) {
-		_pp(w, prefix, k, v, 12, level)
+		_pp(w, prefix, k, v, 13, level)
+	}
+	p("URL", cr.URL)
+	p("HTTP code", fmt.Sprintf("%d", cr.HTTPCode))
+	p("Response time", fmt.Sprintf("%f", cr.ResponseTime.Seconds()))
+	if cr.Err != nil {
+		p("Error", cr.Err.Error())
 	}
 	p("MinorVersion", fmt.Sprintf("%d", cr.MinorVersion))
 	if len(cr.Application) > 0 {
