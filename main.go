@@ -159,7 +159,7 @@ func entryPoint(ctx *cli.Context) error {
 		//fmt.Printf("%s\n", res.String())
 		_e(E_OK, "All good", &res)
 	case <-time.After(tmout):
-		fmt.Printf("%s: Timed out after %.2f seconds getting %q", S_UNKNOWN, to, url)
+		fmt.Printf("%s: Timed out after %.2f seconds getting %q\n", S_UNKNOWN, to, url)
 		os.Exit(E_UNKNOWN)
 	}
 
