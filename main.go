@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	VERSION    string  = "2017-02-06"
+	VERSION    string  = "2017-02-07"
 	UA         string  = "VGT MnM ApiCheck/1.0"
 	DEF_TMOUT  float64 = 30.0
 	DEF_WARN   float64 = 10.0
@@ -54,8 +54,6 @@ func getUrl(url string, verifySSL bool, timeout time.Duration, ua string) (*http
 		Transport: tr,
 		Timeout:   timeout,
 	}
-
-	//log.Debugf("getUrl(): request object: %#v", req)
 
 	return client.Do(req)
 }
@@ -169,7 +167,7 @@ func entryPoint(ctx *cli.Context) error {
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "check_vgtapi"
+	app.Name = "check_functional_tests"
 	app.Version = VERSION
 	//app.Compiled, _ = time.Parse(time.RFC3339, BUILD_DATE)
 	app.Usage = "Nagios Functional Check for VGT API"
