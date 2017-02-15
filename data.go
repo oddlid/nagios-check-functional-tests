@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+type Checks []Check
+type Applications []Application
+type Keys []string
+
 type CheckResponse struct {
 	XMLName      xml.Name      `xml:"CheckResponse"`
 	MinorVersion int           `xml:"minorVersion"`
@@ -36,10 +40,6 @@ type Check struct {
 	FailureReason string `xml:"failureReason,omitempty"`
 }
 
-type Checks []Check
-type Applications []Application
-type Keys []string
-
 func (k Keys) MaxLen() int {
 	max := 0
 	for i := range k {
@@ -56,6 +56,11 @@ func (k Keys) MaxLen() int {
 func _pp(w io.Writer, prefix, key, val string, align, level int) {
 	fmt.Fprintf(w, fmt.Sprintf("%s%s%d%s", strings.Repeat(prefix, level), "%-", align, "s : %s\n"), key, val)
 	//pp_count++
+}
+
+// _hdr is a simplified version of _pp that is used for printing headers
+func _hdr(w io.Writer, prefix, key, sep string, level int) {
+	fmt.Fprintf(w, fmt.Sprintf("%s%s %s\n", strings.Repeat(prefix, level), key, sep))
 }
 
 func (c Check) pp(w io.Writer, prefix string, level int) {
@@ -80,7 +85,7 @@ func (a Application) pp(w io.Writer, prefix string, level int) {
 		"ComponentVersion",
 		"Success",
 		"FailureReason",
-		"#=== Check",
+		"Check",
 	}
 	max := k.MaxLen()
 	p := func(k, v string) {
@@ -97,7 +102,7 @@ func (a Application) pp(w io.Writer, prefix string, level int) {
 		chklen := len(a.Check)
 		if chklen > 0 {
 			for i := range a.Check {
-				p(k[5], fmt.Sprintf("(#%d/%d) ===#", i+1, chklen))
+				_hdr(w, prefix, fmt.Sprintf("%s (#%d/%d)", k[5], i+1, chklen), "=>", level)
 				a.Check[i].pp(w, prefix, level+1)
 			}
 		}
@@ -106,20 +111,20 @@ func (a Application) pp(w io.Writer, prefix string, level int) {
 
 func (cr CheckResponse) pp(w io.Writer, prefix string, level int) {
 	k := Keys{
-		"#=== CheckResponse",
+		"CheckResponse",
 		"URL",
 		"HTTP code",
 		"Response time",
 		"Error",
 		"MinorVersion",
-		"#=== Application",
+		"Application",
 	}
 	max := k.MaxLen()
 	p := func(k, v string) {
 		_pp(w, prefix, k, v, max, level)
 	}
 
-	p(k[0], "===#")
+	fmt.Fprintf(w, "===== BEGIN: %s =====\n", k[0])
 	p(k[1], cr.URL)
 	p(k[2], fmt.Sprintf("%d", cr.HTTPCode))
 	p(k[3], fmt.Sprintf("%f", cr.ResponseTime.Seconds()))
@@ -132,11 +137,12 @@ func (cr CheckResponse) pp(w io.Writer, prefix string, level int) {
 		applen := len(cr.Application)
 		if applen > 0 {
 			for i := range cr.Application {
-				p(k[6], fmt.Sprintf("(#%d/%d) ===#", i+1, applen))
+				_hdr(w, prefix, fmt.Sprintf("%s (#%d/%d)", k[6], i+1, applen), "=>", level)
 				cr.Application[i].pp(w, prefix, level+1)
 			}
 		}
 	}
+	fmt.Fprintf(w, "===== END: %s =======\n", k[0])
 }
 
 func (cr CheckResponse) PrettyPrint(w io.Writer) {
