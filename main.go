@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	VERSION    string  = "2017-02-07"
+	VERSION    string  = "2017-02-15"
 	UA         string  = "VGT MnM ApiCheck/1.0"
 	DEF_INDENT string  = "  "
 	DEF_TMOUT  float64 = 30.0
@@ -44,7 +44,7 @@ func getUrl(url string, verifySSL bool, timeout time.Duration, ua string) (*http
 	}
 
 	tr := &http.Transport{
-		DisableKeepAlives: true, // we're (probably) not reusing the connection, so don't let it hang open
+		DisableKeepAlives: true, // we're not reusing the connection, so don't let it hang open
 	}
 
 	if !verifySSL {
@@ -74,6 +74,7 @@ func parse(url string, timeout time.Duration, ch chan CheckResponse) {
 	cr.HTTPCode = resp.StatusCode
 
 	if cr.HTTPCode != http.StatusOK {
+		log.Debugf("parse(): HTTP Error: %d", cr.HTTPCode)
 		ch <- cr
 		return
 	}
@@ -155,12 +156,11 @@ func entryPoint(ctx *cli.Context) error {
 		if res.ResponseTime.Seconds() >= warn {
 			_e(E_WARNING, "Response time at or above warning limit", &res)
 		}
-		_e(E_OK, "All good", &res)
+		_e(E_OK, "Happy days!", &res)
 	case <-time.After(tmout):
 		fmt.Printf("%s: Timed out after %.2f seconds getting %q\n", S_UNKNOWN, to, url)
 		os.Exit(E_UNKNOWN)
 	}
-
 
 	return nil
 }
@@ -181,42 +181,43 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "url, U",
-			Usage: "URL to check",
+			Usage: "`URL` to check",
 		},
 		cli.Float64Flag{
 			Name:  "timeout, t",
-			Usage: "Timeout in seconds, fractions allowed",
+			Usage: "Timeout in `seconds`, fractions allowed",
 			Value: DEF_TMOUT,
 		},
 		cli.Float64Flag{
 			Name:  "warning, w",
-			Usage: "Warning responsetime in seconds, fractions allowed",
+			Usage: "Warning responsetime in `seconds`, fractions allowed",
 			Value: DEF_WARN,
 		},
 		cli.Float64Flag{
 			Name:  "critical, c",
-			Usage: "Critical responsetime in seconds, fractions allowed",
+			Usage: "Critical responsetime in `seconds`, fractions allowed",
 			Value: DEF_CRIT,
 		},
 		cli.BoolFlag{
-			Name:  "verbose",
+			Name:  "verbose, V",
 			Usage: "Print long output",
 		},
 		cli.StringFlag{
 			Name:  "log-level, l",
 			Value: "error",
-			Usage: "Log level (options: debug, info, warn, error, fatal, panic).",
+			Usage: "Log `level` (options: debug, info, warn, error, fatal, panic).",
 		},
 		cli.BoolFlag{
 			Name:  "debug, d",
-			Usage: "Run in debug mode.",
+			Usage: "Set log-level to debug",
 		},
 	}
 
 	app.Before = func(ctx *cli.Context) error {
 		level, err := log.ParseLevel(ctx.String("log-level"))
 		if err != nil {
-			log.Fatal(err.Error())
+			//log.Fatal(err.Error())
+			return err
 		}
 		log.SetLevel(level)
 		if !ctx.IsSet("log-level") && !ctx.IsSet("l") && ctx.Bool("debug") {

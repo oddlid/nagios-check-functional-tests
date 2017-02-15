@@ -89,7 +89,9 @@ func (a Application) pp(w io.Writer, prefix string, level int) {
 	}
 	max := k.MaxLen()
 	p := func(k, v string) {
-		_pp(w, prefix, k, v, max, level)
+		if v != "" {
+			_pp(w, prefix, k, v, max, level)
+		}
 	}
 
 	p(k[0], a.LongName)
