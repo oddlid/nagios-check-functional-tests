@@ -170,7 +170,7 @@ func main() {
 	app.Name = "check_functional_tests"
 	app.Version = VERSION
 	//app.Compiled, _ = time.Parse(time.RFC3339, BUILD_DATE)
-	app.Usage = "Nagios Functional Check for VGT API"
+	app.Usage = "XML Rest API parser for VGT functional tests"
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "Odd E. Ebbesen",
