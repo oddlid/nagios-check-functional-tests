@@ -113,7 +113,7 @@ func entryPoint(ctx *cli.Context) error {
 		default:
 			status = S_UNKNOWN
 		}
-		msg := fmt.Sprintf("%s: %s; Response time: %f; URL: %q%s", status, desc, cr.ResponseTime.Seconds(), url, perfstr)
+		msg := fmt.Sprintf("%s: %s. Response time: %f. URL: %q%s", status, desc, cr.ResponseTime.Seconds(), url, perfstr)
 		if verbose {
 			msg += cr.String()
 		}
