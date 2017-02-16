@@ -9,6 +9,24 @@ import (
 	"time"
 )
 
+const (
+	VERSION    string  = "2017-02-16"
+	UA         string  = "VGT MnM ApiCheck/1.0"
+	DEF_INDENT string  = "  "
+	DEF_TMOUT  float64 = 30.0
+	DEF_WARN   float64 = 10.0
+	DEF_CRIT   float64 = 15.0
+	DEF_PORT   int     = 80
+	E_OK       int     = 0
+	E_WARNING  int     = 1
+	E_CRITICAL int     = 2
+	E_UNKNOWN  int     = 3
+	S_OK       string  = "OK"
+	S_WARNING  string  = "WARNING"
+	S_CRITICAL string  = "CRITICAL"
+	S_UNKNOWN  string  = "UNKNOWN"
+)
+
 type Checks []Check
 type Applications []Application
 type Keys []string
