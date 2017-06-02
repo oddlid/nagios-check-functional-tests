@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	VERSION    string  = "2017-02-16"
+	VERSION    string  = "2017-06-02"
 	UA         string  = "VGT MnM ApiCheck/1.0"
 	DEF_INDENT string  = "  "
 	DEF_TMOUT  float64 = 30.0

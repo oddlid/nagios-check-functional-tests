@@ -94,6 +94,11 @@ func entryPoint(ctx *cli.Context) error {
 		"timeout":  to,
 	}).Debug("Entrypoint params")
 
+	// abort if empty url
+	if url == "" {
+		return fmt.Errorf("No URL given, aborting")
+	}
+
 	chres := make(chan CheckResponse)
 	defer close(chres)
 
