@@ -96,7 +96,7 @@ func entryPoint(ctx *cli.Context) error {
 
 	// abort if empty url
 	if url == "" {
-		return fmt.Errorf("No URL given, aborting")
+		return cli.NewExitError("No URL given", E_UNKNOWN)
 	}
 
 	chres := make(chan CheckResponse)
